@@ -1,0 +1,79 @@
+传回当前地图的投影对象。如果还未启动地图（即 mapType 仍为 Null），则结果为 Null。侦听 projection_changed 并确保其值不为 Null。
+
+qq.maps.event.addListener(map, 'projection_changed', function(a) {
+        //console.log(map.mapCanvasProjection);
+		qq.maps.event.addListener(map, 'click', function(evt) {
+          var containerPixel = map.mapCanvasProjection.fromLatLngToContainerPixel(evt.latLng);
+          var latLng = map.mapCanvasProjection.fromContainerPixelToLatLng(new qq.maps.Point(450,150));
+          console.log(evt.latLng);
+          console.log(map.getContainer());
+          
+          //创建一个Marker
+    var marker = new qq.maps.Marker({
+        //设置Marker的位置坐标
+        position: new qq.maps.LatLng(latLng.lat, latLng.lng),
+        //设置显示Marker的地图
+        map: map
+    });
+          
+        });
+
+
+
+
+wd = null,
+bi = function(a, b, c, d) {
+    c = Math.pow(2, c);
+    wd || (wd = new O(0, 0));
+    wd.x = b.x / c;
+    wd.y = b.y / c;
+    return a.fromPointToLatLng(wd, d)
+},
+af = function(a, b, c) {
+    if (a = a.fromLatLngToPoint(b)) c = Math.pow(2, c),
+    a.x *= c,
+    a.y *= c;
+    return a
+},
+
+xc = O,
+
+Ud = bi,
+Ae = af,
+
+function ec(a, b, c, d, e) {
+    var f = a.get("projection");
+    a = a.get("zoom");
+    return f && b && Ze(a) && (b = Ae(f, b, a)) ? (c = b.x - Math.round(c), d = b.y - Math.round(d), e && e.x == c && e.y == d ? e: new xc(c, d)) : null
+}
+function ub(a, b, c, d, e, f) {
+    var g = a.get("projection"),
+    h = a.get("zoom");
+    if (b && Ze(h)) {
+        if (!Ze(b.x) || !Ze(b.y)) throw Error("from" + e + "PixelToLatLng: Point.x and Point.y must be of type number");
+        a = a.p;
+        a.x = b.x + Math.round(c);
+        a.y = b.y + Math.round(d);
+        return Ud(g, a, h, f)
+    }
+}
+
+
+
+
+xd.fromLatLngToContainerPixel = function(a) {
+    var b = this.get("projectionTopLeft");
+    return b ? ec(this, a, b.x, b.y) : null
+};
+xd.fromLatLngToDivPixel = function(a, b) {
+    var c = this.get("offset");
+    return c ? ec(this, a, c.width, c.height, b) : null
+};
+xd.fromDivPixelToLatLng = function(a, b) {
+    var c = this.get("offset");
+    return c ? ub(this, a, c.width, c.height, "Div", b) : null
+};
+xd.fromContainerPixelToLatLng = function(a, b) {
+    var c = this.get("projectionTopLeft");
+    return c ? ub(this, a, c.x, c.y, "Container", b) : null
+};
