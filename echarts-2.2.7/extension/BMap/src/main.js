@@ -96,7 +96,7 @@ define(function (require) {
             div.style.width = size.width + 'px';
             div.style.top = 0;
             div.style.left = 0;
-            map.getPanes().labelPane.appendChild(div);
+            map.getPanes().floatPane.appendChild(div);
             return div;
         };
 
@@ -380,7 +380,7 @@ define(function (require) {
                     option.dataRange.range = dataRange._range;
                 }
                 self._ec.clear();
-                self.setOption(option);
+                self.setOption(option);console.log(option);
             }
         };
 

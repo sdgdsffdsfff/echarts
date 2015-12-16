@@ -15,8 +15,9 @@ define(function (require) {
      * @parma {Object=} mapOption 百度地图初始化选项
      * @constructor
      */
-    function BMapExt(obj, BMap, ec, mapOption) {
-        this._init(obj, BMap, ec, mapOption);
+    function SosoMapExt(obj, SosoMap, ec, mapOption, OverlayCallback) {
+		this.OverlayCallback = OverlayCallback;
+        this._init(obj, ec, mapOption);
     };
 
     /**
@@ -25,7 +26,7 @@ define(function (require) {
      * @type {HTMLElement}
      * @private
      */
-    BMapExt.prototype._echartsContainer = null;
+    SosoMapExt.prototype._echartsContainer = null;
 
     /**
      * 百度地图实例
@@ -33,7 +34,7 @@ define(function (require) {
      * @type {BMap.Map}
      * @private
      */
-    BMapExt.prototype._map = null;
+    SosoMapExt.prototype._map = null;
 
     /**
      * 使用的echarts实例
@@ -41,7 +42,7 @@ define(function (require) {
      * @type {ECharts}
      * @private
      */
-    BMapExt.prototype._ec = null;
+    SosoMapExt.prototype._ec = null;
 
     /**
      * geoCoord
@@ -49,7 +50,7 @@ define(function (require) {
      * @type {Object}
      * @private
      */
-    BMapExt.prototype._geoCoord = [];
+    SosoMapExt.prototype._geoCoord = [];
 
     /**
      * 记录地图的便宜量
@@ -57,7 +58,7 @@ define(function (require) {
      * @type {Array.<number>}
      * @private
      */
-    BMapExt.prototype._mapOffset = [0, 0];
+    SosoMapExt.prototype._mapOffset = [0, 0];
 
 
     /**
@@ -68,9 +69,9 @@ define(function (require) {
      * @param {echarts} ec
      * @private
      */
-    BMapExt.prototype._init = function (obj, BMap, ec, mapOption) {
+    SosoMapExt.prototype._init = function (obj, ec, mapOption) {
         var self = this;
-        self._map = obj.constructor == BMap.Map ? obj : new BMap.Map(obj, mapOption);
+        self._map = obj.constructor == qq.maps.Map ? obj : new qq.maps.Map(obj, mapOption);
 
         /**
          * Overlay类,用来生成覆盖物
@@ -80,7 +81,7 @@ define(function (require) {
          */
         function Overlay() {}
 
-        Overlay.prototype = new BMap.Overlay();
+        Overlay.prototype = new qq.maps.Overlay();
 
         /**
          * 初始化
@@ -88,22 +89,34 @@ define(function (require) {
          * @param {BMap.Map} map
          * @override
          */
-        Overlay.prototype.initialize = function (map) {
-            var size = map.getSize();
+        Overlay.prototype.construct = function () {console.log('construct');
+            var container = self._map.getContainer();
             var div = self._echartsContainer = document.createElement('div');
             div.style.position = 'absolute';
-            div.style.height = size.height + 'px';
-            div.style.width = size.width + 'px';
+            div.style.height = container.style.height.replace('px', '') + 'px';
+            div.style.width = container.style.width.replace('px', '') + 'px';
             div.style.top = 0;
             div.style.left = 0;
-            map.getPanes().labelPane.appendChild(div);
-            return div;
+            this.getPanes().overlayLayer.appendChild(div);
+            if (self.OverlayCallback) {
+				self.OverlayCallback.call(this, self);
+			}
         };
 
         /**
          * @override
          */
-        Overlay.prototype.draw = function () {};
+        Overlay.prototype.draw = function () {console.log('draw');
+			//var overlayProjection = this.getProjection();
+			//返回覆盖物容器的相对像素坐标
+			//var pixel = overlayProjection.fromLatLngToDivPixel(this.position);
+			
+		};
+        Overlay.prototype.destroy = function () {
+			self._echartsContainer.onclick = null;
+			self._echartsContainer.parentNode.removeChild(this._echartsContainer);
+			self._echartsContainer = null;
+		};
 
         var myOverlay = new Overlay();
 
@@ -146,8 +159,8 @@ define(function (require) {
          * @public
          */
         self.geoCoord2Pixel = function (geoCoord) {
-            var point = new BMap.Point(geoCoord[0], geoCoord[1]);
-            var pos = self._map.pointToOverlayPixel(point);
+            var point = new qq.maps.LatLng(geoCoord[1], geoCoord[0]);
+            var pos = self._map.get('mapCanvasProjection').fromLatLngToContainerPixel(point);
             return [pos.x, pos.y];
         };
 
@@ -159,7 +172,7 @@ define(function (require) {
          * @public
          */
         self.pixel2GeoCoord = function (pixel) {
-            var point = self._map.overlayPixelToPoint({
+            var point = self._map.get('mapCanvasProjection').fromContainerPixelToLatLng({
                 x: pixel[0],
                 y: pixel[1]
             });
@@ -290,10 +303,10 @@ define(function (require) {
          * @private
          */
         self._bindEvent = function () {
-            self._map.addEventListener('zoomend', _zoomChangeHandler);
+            qq.maps.event.addListener(self._map, 'zoom_changed', _zoomChangeHandler);
 
-            self._map.addEventListener('moving', _moveHandler('moving'));
-            self._map.addEventListener('moveend', _moveHandler('moveend'));
+            qq.maps.event.addListener(self._map, 'dragstart', _moveHandler('moving'));
+            qq.maps.event.addListener(self._map, 'dragend', _moveHandler('moveend'));
 
             self._ec.getZrender().on('dragstart', _dragZrenderHandler(true));
             self._ec.getZrender().on('dragend', _dragZrenderHandler(false));
@@ -315,16 +328,17 @@ define(function (require) {
          * @return {Function}
          * @private
          */
-        function _moveHandler(type) {
+        function _moveHandler(type) {console.log(type);
             return function () {
-                // 记录便宜量
+                // 记录偏移量
                 var offsetEle =
-                    self._echartsContainer.parentNode.parentNode.parentNode;
+                    self._echartsContainer.parentNode.parentNode.parentNode;//transform: matrix(1, 0, 0, 1, -33, 56);
+				var matches = /matrix\(1, 0, 0, 1, (-{0,1}\d+), (-{0,1}\d+)\)/.exec(offsetEle.style.transform);
                 self._mapOffset = [
-                    - parseInt(offsetEle.style.left) || 0,
-                    - parseInt(offsetEle.style.top) || 0
+                    - parseInt(matches[1]) || 0,// left
+                    - parseInt(matches[2]) || 0// top
                 ];
-                self._echartsContainer.style.left = self._mapOffset[0] + 'px';
+                self._echartsContainer.style.left = self._mapOffset[0] + 'px';console.log(matches);console.log(self._mapOffset);
                 self._echartsContainer.style.top = self._mapOffset[1] + 'px';
 
                 _fireEvent(type);
@@ -341,7 +355,8 @@ define(function (require) {
         function _dragZrenderHandler(isStart) {
             return function () {
                 var func = isStart ? 'disableDragging' : 'enableDragging';
-                self._map[func]();
+                //self._map[func]();
+				self._map.set('draggable', isStart ? true : false);
             }
         }
 
@@ -365,7 +380,7 @@ define(function (require) {
          *
          * @public
          */
-        self.refresh = function () {
+        self.refresh = function () {console.log('refresh');
             if (self._ec) {
                 var option = self._ec.getOption();
                 var component = self._ec.component || {};
@@ -384,8 +399,8 @@ define(function (require) {
             }
         };
 
-        self._map.addOverlay(myOverlay);
+        myOverlay.setMap(self._map);
     };
 
-    return BMapExt;
+    return SosoMapExt;
 });
